@@ -1,130 +1,80 @@
 # Procesamiento de imágenes
 
-Este directorio contiene un conjunto de códigos que permiten aplicar un conjunto de filtros básicos a una imagen usando el lenguaje C.
-Los filtros que se pueden aplicar son:
+# Resultados de Ejecución
 
-- Filtro de desenfoque.
-- Filtro de detección de bordes.
-- Filtro de Realce. 
+Este archivo muestra los resultados de ejecución de un programa en dos modos: secuencial y paralelizado con OpenMP. Se detallan los tiempos de ejecución y las métricas de rendimiento como el speedup y la eficiencia.
 
-El programa `main.c` contiene el código para aplicar estos filtros.
-Este programa lee la información de los bits que representan una imagen y hace las transformaciones necesarias.
-Se han desarrollado dos scripts en Python que permiten extraer los bits de información de una imagen en formato PNG (`fromPNG2Bin.py`) y toma un conjunto de bits y los almacena de regreso en una imagen en formato PNG (`fromBin2PNG.py`).
+---
 
-Se ha desarrollado un script en Bash llamado `all.sh` y el cual integra los códigos descritos anteriormente para aplicar un filtro a una imagen. 
+## Ejecución Secuencial
 
-El `Makefile` permite la compilación y ejecución de los códigos/archivos descritos anteriormente.
+| Exec | Tiempo (s) |
+|------|------------|
+| 1    | 40.28      |
+| 2    | 31.83      |
+| 3    | 40.69      |
+| 4    | 36.48      |
+| 5    | 39.61      |
 
-- `make all` permite la compilación y la ejecución del programa.
-- `make compile` permite la compilación del programa `main.c`.
-- `make clean` borra archivos creados durante la compilación y la ejecución del programa.
+**Tiempo de ejecución promedio**: 38.79 s
 
-## Descripción 
+---
 
-El script `all.sh` usa tres programas le aplican un filtro a una imagen PNG de 1024x1024.
+## Ejecución Paralelizada con OpenMP
 
-El script `all.sh` contiene lo siguiente:
+### 12 Hilos
 
+| Exec | Tiempo (s) |
+|------|------------|
+| 1    | 25.90      |
+| 2    | 38.17      |
+| 3    | 54.61      |
+| 4    | 35.90      |
+| 5    | 38.60      |
+
+**Tiempo de ejecución promedio**: 37.56 s  
+**Speedup**: 1.033  
+**Eficiencia**: 0.086 = 8.6%
+
+### 24 Hilos
+
+| Exec | Tiempo (s) |
+|------|------------|
+| 1    | 25.87      |
+| 2    | 33.10      |
+| 3    | 48.65      |
+| 4    | 39.89      |
+| 5    | 41.74      |
+
+**Tiempo de ejecución promedio**: 38.24 s  
+**Speedup**: 1.014  
+**Eficiencia**: 0.0422 = 4.22%
+
+---
+
+## Conclusiones y Comentarios
+
+- Agregué un archivo llamado getDimension.py que obtiene las dimensiones de la imagen, para después ser almacenadas en una variable de bash y por último ser entregadas como parámetros a los procesos main y fromBin2PNG.py. Esto con el objetivo de que se procesen correctamente imágenes de cualquier dimensión y no solo de 1024 * 1024.
+
+```python
+# getDimension.py
+import sys
+from PIL import Image
+
+if len(sys.argv) != 2:
+    print("Uso: Obtener dimensiones de la imagen")
+    sys.exit(1)
+
+image_file = sys.argv[1]
+with Image.open(image_file) as img:
+    width, height = img.size
+
+print(f"{width} {height}")
 ```
-#!/usr/bin/env bash
-INPUT_PNG="image.png"
-TEMP_FILE="image.bin"
-python3 fromPNG2Bin.py ${INPUT_PNG}
-./main ${TEMP_FILE}
-python3 fromBin2PNG.py ${TEMP_FILE}.new
-```
+ - Al implementar openMP se utilizó la directiva “#pragma omp parallel for” en los ciclos de las funciones “aplicaFiltro” y “calcularSumaPixeles”. Adicionalmente para “aplicaFiltro” se utilizó el método “schedule(dynamic)” para balancear la carga en cada hilo y para “calcularSumaPixeles” el método “reduction(+:suma)” para evitar competencia al modificar la variable compartida, fork-join.
+ - Para la implementación con 12 hilos, el total disponible de la máquina, su speed up refleja una mejora muy pequeña con respecto a la versión secuencial de siendo un  3.3% más rápida y en la eficiencia también se observa un valor muy pequeño por lo que la optimización del algoritmo tiene un margen mucho mayor.
+ - Para la implementación con 24 hilos, el doble del total disponible de la máquina, su speed up refleja una mejora respecto al secuencial, pero un menor número a la versión con 12 hilos, ya que crear más hilos de los disponibles no garantiza un mayor rendimiento, hay una mayor competencia por los recursos y eso se ve reflejado en su eficiencia. 
 
-Los tres programas que se usan son `fromPNG2Bin.py`, `fromBin2PNG.py` y `main`. 
-En este caso se asume que `image.png` es una imagen PNG de 1024x1024.
-Lo que hace el script `fromPNG2Bin.py` es convertir la imagen de formanto PNG a una secuencia de pixeles.
-Esa secuencia de pixeles queda almacenada en `image.bin` (`${TEMP_FILE}`).
-Sobre los datos en `image.bin` se aplica un filtro que está en el archivo `./main`. 
-Al terminar la ejecución del programa `main` se genera un archivo en este caso llamado `image.bin.new`.
-El archivo `image.bin.new` es pasado al script `fromBin2PNG.py` y genera un nuevo archivo llamado `image.bin.PNG`. 
-Este archivo es el archivo que contiene el PNG alterado.
 
-## Otros posibles filtros
-
-Para usar los filtros que se presentan a continuación se debe cambiar la función `aplicarFiltro` que se encuentra en el programa `main.c`.
-
-### Filtro de desenfoque (Blur Filter)
-
-```
-void aplicarFiltro(int *imagen, int *imagenProcesada, int width, int height) {
-    // Recorre cada píxel de la imagen (excepto los bordes)
-    for (int y = 1; y < height - 1; y++) {
-        for (int x = 1; x < width - 1; x++) {
-            // Promedia los valores de los píxeles vecinos
-            int sum = 0;
-            sum += imagen[(y - 1) * width + (x - 1)];  // Superior Izquierda
-            sum += imagen[(y - 1) * width + x];        // Superior
-            sum += imagen[(y - 1) * width + (x + 1)];  // Superior Derecha
-            sum += imagen[y * width + (x - 1)];        // Izquierda
-            sum += imagen[y * width + x];              // Centro
-            sum += imagen[y * width + (x + 1)];        // Derecha
-            sum += imagen[(y + 1) * width + (x - 1)];  // Inferior Izquierda
-            sum += imagen[(y + 1) * width + x];        // Inferior
-            sum += imagen[(y + 1) * width + (x + 1)];  // Inferior Derecha
-
-            imagenProcesada[y * width + x] = sum / 9;  // Asigna el promedio al píxel procesado
-        }
-    }
-}
-
-```
-
-### Filtro de detección de bordes (Edge Detection) - Filtro Sobel
-
-```
-void aplicarFiltro(int *imagen, int *imagenProcesada, int width, int height) {
-    int Gx[3][3] = {{-1, 0, 1}, {-2, 0, 2}, {-1, 0, 1}};
-    int Gy[3][3] = {{-1, -2, -1}, {0, 0, 0}, {1, 2, 1}};
-
-    for (int y = 1; y < height - 1; y++) {
-        for (int x = 1; x < width - 1; x++) {
-            int sumX = 0;
-            int sumY = 0;
-
-            // Aplicar máscaras de Sobel (Gx y Gy)
-            for (int ky = -1; ky <= 1; ky++) {
-                for (int kx = -1; kx <= 1; kx++) {
-                    sumX += imagen[(y + ky) * width + (x + kx)] * Gx[ky + 1][kx + 1];
-                    sumY += imagen[(y + ky) * width + (x + kx)] * Gy[ky + 1][kx + 1];
-                }
-            }
-
-            // Calcular magnitud del gradiente
-            int magnitude = abs(sumX) + abs(sumY);
-            imagenProcesada[y * width + x] = (magnitude > 255) ? 255 : magnitude;  // Normalizar a 8 bits
-        }
-    }
-}
-
-```
-
-### Filtro de Realce (Sharpen Filter)
-
-```
-void aplicarFiltro(int *imagen, int *imagenProcesada, int width, int height) {
-    int kernel[3][3] = {{0, -1, 0}, {-1, 5, -1}, {0, -1, 0}};
-
-    for (int y = 1; y < height - 1; y++) {
-        for (int x = 1; x < width - 1; x++) {
-            int sum = 0;
-
-            // Aplicar kernel de realce
-            for (int ky = -1; ky <= 1; ky++) {
-                for (int kx = -1; kx <= 1; kx++) {
-                    sum += imagen[(y + ky) * width + (x + kx)] * kernel[ky + 1][kx + 1];
-                }
-            }
-
-            // Clampeo del valor para que esté entre 0 y 255
-            imagenProcesada[y * width + x] = (sum > 255) ? 255 : (sum < 0) ? 0 : sum;
-        }
-    }
-}
-
-```
 
 # paralelas-distribuidas-1er-parcial
