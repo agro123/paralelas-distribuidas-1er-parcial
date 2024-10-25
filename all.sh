@@ -18,12 +18,17 @@ IMAGE_DIR="./images"
 for INPUT_PNG in ${IMAGE_DIR}/*.jpg; do
     echo "--------------------------------------------------------"
     echo "Procesando $INPUT_PNG..."
+    # Obtener las dimensiones de la imagen usando el script getDimensions.py
+    dimensions=$(python3 getDimensions.py ${INPUT_PNG})
+    width=$(echo $dimensions | cut -d ' ' -f 1)
+    height=$(echo $dimensions | cut -d ' ' -f 2)
+    echo "Dimensiones de la imagen Width: $width, Height: $height"
+
     TEMP_FILE="${INPUT_PNG%.jpg}.bin"
-    
     python3 fromPNG2Bin.py ${INPUT_PNG}
-    ./main ${TEMP_FILE}
-    python3 fromBin2PNG.py ${TEMP_FILE}.new
-    
+    ./main ${TEMP_FILE} $width $height
+    python3 fromBin2PNG.py ${TEMP_FILE}.new $width $height #Entrego el width y el height
+
     echo "Procesamiento de $INPUT_PNG finalizado."
     echo "--------------------------------------------------------"
 done

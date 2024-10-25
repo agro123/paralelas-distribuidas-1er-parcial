@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include <omp.h>
 // Funciones placeholder para la carga y guardado de imágenes
 void cargarImagen(int *imagen, int width, int height);
 void guardarImagen(int *imagen, int width, int height);
@@ -14,12 +14,14 @@ int calcularSumaPixeles(int *imagen, int width, int height);
 
 char *filename;
 
+int numThread = 24; //Numero de hilos a utilizar
+
 int main(int argc, char* argv[]) {
-    int width = 1024, height = 1024;
+    int width = atoi(argv[2]), height = atoi(argv[3]);
     int *imagen = (int *)malloc(width * height * sizeof(int));
     int *imagenProcesada = (int *)malloc(width * height * sizeof(int));
 
-    if (argc != 2) {
+    if (argc != 4) {
       fprintf(stderr, "Dar un nombre de archivo de entrada");
       exit(1);
     }
@@ -83,16 +85,20 @@ void guardarImagen(int *imagen, int width, int height) {
 void aplicarFiltro(int *imagen, int *imagenProcesada, int width, int height) {
     int Gx[3][3] = {{-1, 0, 1}, {-2, 0, 2}, {-1, 0, 1}};
     int Gy[3][3] = {{-1, -2, -1}, {0, 0, 0}, {1, 2, 1}};
+
+    //Directiva omp para for
+    //El metodo schedule  distribuye iteraciones a diferentes hilos en el bucle for.
+    #pragma omp parallel for schedule(dynamic) num_threads(numThread)
     for (int y = 1; y < height - 1; y++) {
         for (int x = 1; x < width - 1; x++) {
             int sumX = 0;
             int sumY = 0;
             // Aplicar máscaras de Sobel (Gx y Gy)
             for (int ky = -1; ky <= 1; ky++) {
-            for (int kx = -1; kx <= 1; kx++) {
-            sumX += imagen[(y + ky) * width + (x + kx)] * Gx[ky + 1][kx + 1];
-            sumY += imagen[(y + ky) * width + (x + kx)] * Gy[ky + 1][kx + 1];
-            }
+                for (int kx = -1; kx <= 1; kx++) {
+                    sumX += imagen[(y + ky) * width + (x + kx)] * Gx[ky + 1][kx + 1];
+                    sumY += imagen[(y + ky) * width + (x + kx)] * Gy[ky + 1][kx + 1];
+                }
             }
             // Calcular magnitud del gradiente
             int magnitude = abs(sumX) + abs(sumY);
@@ -101,7 +107,7 @@ void aplicarFiltro(int *imagen, int *imagenProcesada, int width, int height) {
     }
 }
 
-void aplicarFiltroOlD(int *imagen, int *imagenProcesada, int width, int height) {
+void aplicarFiltroOld(int *imagen, int *imagenProcesada, int width, int height) {
     // Código que aplica un filtro a cada píxel (paralelizable)
     for (int i = 0; i < width * height; i++) {
         imagenProcesada[i] = imagen[i] / 2;  // Ejemplo de operación de filtro
@@ -110,6 +116,8 @@ void aplicarFiltroOlD(int *imagen, int *imagenProcesada, int width, int height) 
 
 int calcularSumaPixeles(int *imagen, int width, int height) {
     int suma = 0;
+    //Directiva omp con el metodo reduction para optimizar la suma
+    #pragma omp parallel for reduction(+:suma) num_threads(numThread)
     for (int i = 0; i < width * height; i++) {
         suma += imagen[i];
     }

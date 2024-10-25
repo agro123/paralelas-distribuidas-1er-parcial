@@ -1,0 +1,6 @@
+*.bin
+*.bin.new
+
+/test/
+/serial/
+/omp/
